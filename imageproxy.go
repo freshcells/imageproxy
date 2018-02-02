@@ -14,7 +14,7 @@
 
 // Package imageproxy provides an image proxy server.  For typical use of
 // creating and using a Proxy, see cmd/imageproxy/main.go.
-package imageproxy // import "willnorris.com/go/imageproxy"
+package imageproxy // import "github.com/freshcells/imageproxy"
 
 import (
 	"bufio"
@@ -32,7 +32,8 @@ import (
 	"time"
 
 	"github.com/gregjones/httpcache"
-	tphttp "willnorris.com/go/imageproxy/third_party/http"
+	tphttp "github.com/freshcells/imageproxy/third_party/http"
+	"os"
 )
 
 // Proxy serves image requests.
@@ -53,6 +54,11 @@ type Proxy struct {
 	// reference to.  If nil, all remote URLs specified in requests must be
 	// absolute.
 	DefaultBaseURL *url.URL
+
+	// ImagesPath used when images should be served from local storage.
+	// It relative to working directory
+	// If nil proxy works with external URLs
+	ImagesPath os.FileInfo
 
 	// SignatureKey is the HMAC key used to verify signed requests.
 	SignatureKey []byte
@@ -115,7 +121,13 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var h http.Handler = http.HandlerFunc(p.serveImage)
+	var h http.Handler
+	if p.ImagesPath != nil {
+		h  = http.HandlerFunc(p.serveImageFromFS)
+	} else {
+		h = http.HandlerFunc(p.serveImage)
+	}
+
 	if p.Timeout > 0 {
 		h = tphttp.TimeoutHandler(h, p.Timeout, "Gateway timeout waiting for remote resource.")
 	}
@@ -140,6 +152,49 @@ func (p *Proxy) serveImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
+
+	resp, err := p.Client.Get(req.String())
+	if err != nil {
+		msg := fmt.Sprintf("error fetching remote image: %v", err)
+		log.Print(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	cached := resp.Header.Get(httpcache.XFromCache)
+	if p.Verbose {
+		log.Printf("request: %v (served from cache: %v)", *req, cached == "1")
+	}
+
+	copyHeader(w.Header(), resp.Header, "Cache-Control", "Last-Modified", "Expires", "Etag", "Link")
+
+	if should304(r, resp) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	copyHeader(w.Header(), resp.Header, "Content-Length", "Content-Type")
+
+	//Enable CORS for 3rd party applications
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+// serveImage handles incoming requests for proxied images.
+func (p *Proxy) serveImageFromFS(w http.ResponseWriter, r *http.Request) {
+	req, err := NewFSRequest(r, p.DefaultBaseURL)
+	if err != nil {
+		msg := fmt.Sprintf("invalid request URL: %v", err)
+		log.Print(msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	// assign static settings from proxy to req.Options
+	req.Options.ScaleUp = p.ScaleUp
 
 	resp, err := p.Client.Get(req.String())
 	if err != nil {
