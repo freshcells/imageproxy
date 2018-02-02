@@ -316,6 +316,23 @@ func (r Request) String() string {
 	return u.String()
 }
 
+// Request is an imageproxy request which includes a path of an image to
+// proxy, and an optional set of transformations to perform.
+type FSRequest struct {
+	URL      *url.URL      // Path of the image to proxy
+	Options  Options       // Image transformation to perform
+	Original *http.Request // The original HTTP request
+}
+
+// String returns the request URL as a string, with r.Options encoded in the
+// URL fragment.
+func (r FSRequest) String() string {
+	u := *r.URL
+	u.Fragment = r.Options.String()
+	return u.String()
+}
+
+
 // NewRequest parses an http.Request into an imageproxy Request.  Options and
 // the remote image URL are specified in the request path, formatted as:
 // /{options}/{remote_url}.  Options may be omitted, so a request path may
@@ -361,6 +378,39 @@ func NewRequest(r *http.Request, baseURL *url.URL) (*Request, error) {
 
 	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
 		return nil, URLError{"remote URL must have http or https scheme", r.URL}
+	}
+
+	// query string is always part of the remote URL
+	req.URL.RawQuery = r.URL.RawQuery
+	return req, nil
+}
+
+// NewRequest parses an http.Request into an imageproxy Request.  Options and
+// the local image URL are specified in the request path, formatted as:
+// /{options}/{file_path}.  Options may be omitted, so a request path may
+// simply contain /{file_path}.
+//
+// Assuming an imageproxy server running on localhost, the following are all
+// valid imageproxy requests:
+//
+// 	http://localhost/100x200/assets/image.jpeg
+// 	http://localhost/images/image.jpg
+func NewFSRequest(r *http.Request, baseURL *url.URL) (*FSRequest, error) {
+	var err error
+	req := &FSRequest{Original: r}
+
+	path := r.URL.EscapedPath()[1:] // strip leading slash
+	req.URL, err = parseURL(path)
+	if err != nil || !req.URL.IsAbs() {
+		// first segment should be options
+		parts := strings.SplitN(path, "/", 2)
+		if len(parts) != 2 {
+			return nil, URLError{"too few path segments", r.URL}
+		}
+
+		req.URL, err = parseURL(parts[1])
+
+		req.Options = ParseOptions(parts[0])
 	}
 
 	// query string is always part of the remote URL

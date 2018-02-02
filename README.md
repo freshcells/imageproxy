@@ -169,6 +169,14 @@ Reload the [codercat URL][], and you should now get an error message.  You can
 specify multiple hosts as a comma separated list, or prefix a host value with
 `*.` to allow all sub-domains as well.
 
+### Local Path ###
+
+If this option is enabled imageproxy serves images from local path. 
+Image path is relative to working directory. Example:
+
+    imageproxy -imagePath assets/images
+
+
 ### Signed Requests ###
 
 Instead of a host whitelist, you can require that requests be signed.  This is

@@ -1,10 +1,11 @@
 FROM golang:1.9 as build
-MAINTAINER Will Norris <will@willnorris.com>
+MAINTAINER Sergei Buinov <sergey.buinov@returnonintelligence.com>
+LABEL authors="Will Norris <will@willnorris.com>"
 
-WORKDIR /go/src/willnorris.com/go/imageproxy
+WORKDIR /go/src/github.com/freshcells/imageproxy
 ADD . .
 
-WORKDIR /go/src/willnorris.com/go/imageproxy/cmd/imageproxy
+WORKDIR /go/src/github.com/freshcells/imageproxy/cmd/imageproxy
 RUN go-wrapper download
 RUN CGO_ENABLED=0 GOOS=linux go-wrapper install
 
