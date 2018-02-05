@@ -254,7 +254,7 @@ In most cases, you can follow the normal procedure for building a deploying any
 go application.  For example, I build it directly on my production debian server
 using:
 
- - `go build willnorris.com/go/imageproxy/cmd/imageproxy`
+ - `go build github.com/freshcells/imageproxy/cmd/imageproxy`
  - copy resulting binary to `/usr/local/bin`
  - copy [`etc/imageproxy.service`](etc/imageproxy.service) to
    `/lib/systemd/system` and enable using `systemctl`.
@@ -269,11 +269,11 @@ a look at [this GitHub repo](https://github.com/oreillymedia/prototype-imageprox
 
 ### Docker ###
 
-A docker image is available at [`willnorris/imageproxy`](https://registry.hub.docker.com/u/willnorris/imageproxy/dockerfile/).
+A docker image is available at [`freshcells/imageproxy`](https://registry.hub.docker.com/u/freshcells/imageproxy/dockerfile/).
 
 You can run it by
 ```
-docker run -p 8080:8080 willnorris/imageproxy -addr 0.0.0.0:8080
+docker run -p 8080:8080 freshcells/imageproxy -addr 0.0.0.0:8080
 ```
 
 Or in your Dockerfile:
